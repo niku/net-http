@@ -1654,14 +1654,18 @@ module Net   #:nodoc:
       end
 
       debug "opening connection to #{conn_addr}:#{conn_port}..."
-      s = Timeout.timeout(@open_timeout, Net::OpenTimeout) {
-        begin
-          TCPSocket.open(conn_addr, conn_port, @local_host, @local_port)
-        rescue => e
-          raise e, "Failed to open TCP connection to " +
-            "#{conn_addr}:#{conn_port} (#{e.message})"
-        end
-      }
+      s = begin
+        Timeout.timeout(@open_timeout, Net::OpenTimeout) {
+          begin
+            TCPSocket.open(conn_addr, conn_port, @local_host, @local_port)
+          rescue => e
+            raise e, "Failed to open TCP connection to " +
+              "#{conn_addr}:#{conn_port} (#{e.message})"
+          end
+        }
+      rescue Ractor::IsolationError
+        TCPSocket.open(conn_addr, conn_port, @local_host, @local_port, open_timeout: @open_timeout)
+      end
       s.setsockopt(Socket::IPPROTO_TCP, Socket::TCP_NODELAY, 1)
       debug "opened"
       if use_ssl?
